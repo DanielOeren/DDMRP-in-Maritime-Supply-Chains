@@ -1,0 +1,17 @@
+{
+  "total_demand": 1668.0,
+  "unit_fill_rate": 0.5857314148681055,
+  "demand_period_service_rate": 0.692167577413479,
+  "stockout_item_periods": 169,
+  "backlog_item_periods": 1454,
+  "unmet_units_at_request": 691.0,
+  "ending_backlog": 1.0,
+  "average_inventory_units": 352.19272727272727,
+  "average_inventory_value": 337787.83585454547,
+  "ending_pipeline_units": 105.0,
+  "regular_orders": 448,
+  "emergency_orders": 0,
+  "order_units": 2257.0,
+  "evaluation_periods": 275,
+  "items": 50
+}

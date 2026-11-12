@@ -1,0 +1,7 @@
+# Presentation/execution dependencies; the MRP core remains standard-library only.
+-r ../requirements.txt
+pandas>=2.2
+matplotlib>=3.9
+ipykernel>=6.29
+nbformat>=5.10
+nbclient>=0.10

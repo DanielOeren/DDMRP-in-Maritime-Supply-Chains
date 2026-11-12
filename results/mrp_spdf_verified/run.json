@@ -1,0 +1,71 @@
+{
+  "policy": "mrp",
+  "config": {
+    "train_periods": 24,
+    "forecast_window": 12,
+    "planning_horizon": 60,
+    "lead_time_cv": 0.0,
+    "seed": 42
+  },
+  "source": {
+    "source": "spdf_oil",
+    "period_unit": "month",
+    "currency": "source currency unspecified",
+    "synthetic": false,
+    "sha256": {
+      "data\\temp_downloads\\spdf-main\\Data_deel1a.xls": "388cbcab4770176485a8aa51707741ea0b50f89da63e1b8f25de11e87924dc0b",
+      "data\\temp_downloads\\spdf-main\\Data _deel1b.xls": "ce6de323441d431dcb4d85ba5a51299733ea4faafd87e2c79b82e5f8c8877444"
+    },
+    "initial_stock": "zero scenario",
+    "negative_cells_clipped": 8,
+    "documented_blank_cells_zeroed": 1196,
+    "transformations": [
+      "Original halves only; chronology reversed; contiguous Dec 1997-Aug 2001 retained.",
+      "Calendar-day lead times divided by 30.4375 and rounded upward, minimum one month.",
+      "Min is a reorder point, NOT safety stock; safety stock set to zero.",
+      "Negative net consumption rejected unless explicit clip proxy assumption selected.",
+      "Zero prices retained and flagged by count; consumption is not observed gross demand."
+    ],
+    "zero_price_items": 1
+  },
+  "implementation_sha256": {
+    "C:\\master-og-prosjekt\\src\\__init__.py": "df06ae96e4ed1cca55e26f9f8803a4e4f79eebd307ba9a244b603515b9340df5",
+    "C:\\master-og-prosjekt\\src\\data\\__init__.py": "5a0cf2b4e717a6013442cc537e3a418bbf2f1cdff4720ba43a743f336a392167",
+    "C:\\master-og-prosjekt\\src\\data\\adapters.py": "d3ab1d44f8edc1295b4e671bee95b2a005314ba3d60f276e950a5578db70bcd0",
+    "C:\\master-og-prosjekt\\src\\data\\schema.py": "d8bb6a6373769e97aedd4a09842285e0a08518d8450c5efd96bc6c3ec6f847b7",
+    "C:\\master-og-prosjekt\\src\\evaluation\\__init__.py": "9ddb6abe105d579a900fdf4b22754b95bc3b0019cc3c4bcd611ee238fa276a76",
+    "C:\\master-og-prosjekt\\src\\evaluation\\metrics.py": "d4cf12eb5e5cdd48f9e2664c3befb5b0c1ca1de74a54cb899b092cd2f06b936d",
+    "C:\\master-og-prosjekt\\src\\mrp\\__init__.py": "4f4d1e5192ed67584b030ea07897efc90d0eac20c72a2de106577cfaabf9533e",
+    "C:\\master-og-prosjekt\\src\\mrp\\__main__.py": "6b2f4ff5398736ed530ed82b032cb09f258dfc2b2158b7ee9db444ae005b7fc6",
+    "C:\\master-og-prosjekt\\src\\mrp\\planning.py": "69bd7f757852f0467f27b16672c1b6d798940b67821d80a7530e6c20db34087f",
+    "C:\\master-og-prosjekt\\src\\simulation\\__init__.py": "234df647325374dc034ac944b3c3d1d7388a70cb3fd62aecf951f22a24c1f4e6",
+    "C:\\master-og-prosjekt\\src\\simulation\\engine.py": "13c580618cd6773c4bb1652a5b762daa4292da708f95597f1b919823e495338f"
+  },
+  "arguments": {
+    "source": "spdf-oil",
+    "input": null,
+    "output": "results\\mrp_spdf_verified",
+    "max_items": 50,
+    "offshore_only": false,
+    "source_stock": false,
+    "returns": "clip",
+    "train_periods": null,
+    "forecast_window": null,
+    "planning_horizon": 60,
+    "lead_time_cv": 0.0,
+    "seed": 42,
+    "safety_stock": null,
+    "minimum_order": 0,
+    "order_multiple": 1,
+    "fixed_order": 0
+  },
+  "assumptions": [
+    "Backorders, FIFO aggregate backlog first; no lost sales.",
+    "Receive then decide without current demand, then fulfil current demand.",
+    "Trailing mean forecast; training/evaluation separated chronologically.",
+    "No emergency fulfilment; late planned releases use regular lead time.",
+    "Nominal outstanding due dates visible; actual future arrival shocks hidden.",
+    "No warmup excluded: cold-start effects included; terminal pipeline/backlog reported.",
+    "End-period on-hand valuation; no holding-cost rate or unverified currency conversion."
+  ]
+}

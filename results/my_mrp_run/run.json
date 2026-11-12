@@ -1,0 +1,73 @@
+{
+  "policy": "mrp",
+  "config": {
+    "train_periods": 90,
+    "forecast_window": 60,
+    "planning_horizon": 60,
+    "lead_time_cv": 0.0,
+    "seed": 42
+  },
+  "source": {
+    "source": "oil041",
+    "period_unit": "day",
+    "currency": "USD",
+    "synthetic": true,
+    "sha256": {
+      "data\\temp_downloads\\oil041\\spare_parts_master.csv": "2b0da65c01ef0c855d087f9d55c735fc9b28f0389ca6a9125e298623c638d9be",
+      "data\\temp_downloads\\oil041\\facility_master.csv": "2f74ff8ed6db68534a07bc38826a39f54c2b3e859b4dbef4230a28c731b12222",
+      "data\\temp_downloads\\oil041\\maintenance_consumption.csv": "cdcb8bd5979655f2f21a29ddcd483883144dcf73c3f2dabbbfafa555b1914e1d",
+      "data\\temp_downloads\\oil041\\inventory_levels.csv": "3eb6d88a48ddd3df29f29df503b63da96e0ef33473737be43b5203688c2aad82"
+    },
+    "offshore_only": false,
+    "initial_stock": "zero scenario",
+    "transformations": [
+      "Parts selected by sorted ID, not future demand.",
+      "Daily consumption summed across selected facilities into one pooled stocking point per part.",
+      "Absent daily consumption treated as zero within the published event horizon.",
+      "Lead times rounded upward to days; minimum one day.",
+      "Safety stock summed across selected inventory rows; missing pairs contribute zero.",
+      "Snapshot safety stock is a synthetic scenario parameter, not a historically known policy.",
+      "No warehouse allocation or transfer network is inferred; no source KPI labels used."
+    ]
+  },
+  "implementation_sha256": {
+    "C:\\master-og-prosjekt\\src\\__init__.py": "df06ae96e4ed1cca55e26f9f8803a4e4f79eebd307ba9a244b603515b9340df5",
+    "C:\\master-og-prosjekt\\src\\data\\__init__.py": "5a0cf2b4e717a6013442cc537e3a418bbf2f1cdff4720ba43a743f336a392167",
+    "C:\\master-og-prosjekt\\src\\data\\adapters.py": "d3ab1d44f8edc1295b4e671bee95b2a005314ba3d60f276e950a5578db70bcd0",
+    "C:\\master-og-prosjekt\\src\\data\\schema.py": "d8bb6a6373769e97aedd4a09842285e0a08518d8450c5efd96bc6c3ec6f847b7",
+    "C:\\master-og-prosjekt\\src\\evaluation\\__init__.py": "9ddb6abe105d579a900fdf4b22754b95bc3b0019cc3c4bcd611ee238fa276a76",
+    "C:\\master-og-prosjekt\\src\\evaluation\\metrics.py": "d4cf12eb5e5cdd48f9e2664c3befb5b0c1ca1de74a54cb899b092cd2f06b936d",
+    "C:\\master-og-prosjekt\\src\\mrp\\__init__.py": "4f4d1e5192ed67584b030ea07897efc90d0eac20c72a2de106577cfaabf9533e",
+    "C:\\master-og-prosjekt\\src\\mrp\\__main__.py": "6b2f4ff5398736ed530ed82b032cb09f258dfc2b2158b7ee9db444ae005b7fc6",
+    "C:\\master-og-prosjekt\\src\\mrp\\planning.py": "69bd7f757852f0467f27b16672c1b6d798940b67821d80a7530e6c20db34087f",
+    "C:\\master-og-prosjekt\\src\\simulation\\__init__.py": "234df647325374dc034ac944b3c3d1d7388a70cb3fd62aecf951f22a24c1f4e6",
+    "C:\\master-og-prosjekt\\src\\simulation\\engine.py": "13c580618cd6773c4bb1652a5b762daa4292da708f95597f1b919823e495338f"
+  },
+  "arguments": {
+    "source": "oil041",
+    "input": null,
+    "output": "results\\my_mrp_run",
+    "max_items": 50,
+    "offshore_only": false,
+    "source_stock": false,
+    "returns": "reject",
+    "train_periods": null,
+    "forecast_window": null,
+    "planning_horizon": 60,
+    "lead_time_cv": 0.0,
+    "seed": 42,
+    "safety_stock": null,
+    "minimum_order": 0,
+    "order_multiple": 1,
+    "fixed_order": 0
+  },
+  "assumptions": [
+    "Backorders, FIFO aggregate backlog first; no lost sales.",
+    "Receive then decide without current demand, then fulfil current demand.",
+    "Trailing mean forecast; training/evaluation separated chronologically.",
+    "No emergency fulfilment; late planned releases use regular lead time.",
+    "Nominal outstanding due dates visible; actual future arrival shocks hidden.",
+    "No warmup excluded: cold-start effects included; terminal pipeline/backlog reported.",
+    "End-period on-hand valuation; no holding-cost rate or unverified currency conversion."
+  ]
+}
