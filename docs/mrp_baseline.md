@@ -1,66 +1,97 @@
-# MRP baseline
+# Forecast-driven MRP baseline
 
-This is a runnable independent-demand, single-echelon MRO baseline, not BOM-explosion manufacturing MRP. No supplied dataset establishes a complete BOM. A future BOM adapter can produce gross requirements for the same planner. The baseline is forecast-driven time-phased netting, not an optimal inventory policy or evidence that DDMRP wins.
+The model plans purchased spares with independent demand. Each SKU has one pooled stocking point, one nominal replenishment lead time and a review every period. The available sources lack the bill of materials, dated opening inventory and supplier order-to-receipt history required to reconstruct an industrial MRP installation.
 
-## Run from the repository root
+## Inputs and assumptions
 
-Python 3.10+; OIL-041 and the simulator use only the standard library. The optional original Excel adapter uses `xlrd`:
+| Input | Source information | Simulation treatment |
+|---|---|---|
+| OIL-041 demand | Synthetic part, facility, quantity and work-order timestamp in 2021 | Sum consumption by part/day across included facilities. A day without an event contributes zero. Offshore mode filters on the facility master. All eligible master parts stay in the selection frame. |
+| OIL-041 stock and cost | Undated synthetic warehouse snapshot, reservations, safety stock, USD unit cost | Default opening stock is zero. `--source-stock` sums available stock after flooring stock less reservations at zero **at each warehouse**. The buffer sums recorded safety stock. Missing rows contribute zero and their coverage is reported. |
+| SPDF consumption | Signed monthly net withdrawals, Jan 1997–Aug 2001, reverse chronological order | Use the contiguous 45 months starting Dec 1997. The source flags Nov 1997 as unreliable. Omitting Jan–Oct sacrifices ten valid months and avoids treating Oct and Dec as adjacent. A whole documented blank year maps to zero. A partial-year blank raises an error. |
+| SPDF returns | Negative values and zeros can reflect returns | Reject negatives by default. Explicit `--returns clip` sets negatives to zero in the demand proxy and retains the signed cell, date, treatment and clipped quantity. Gross requests and return dates cannot be reconstructed from a net monthly total. |
+| SPDF stock and cost | Undated stock, Min, Max, unit price and equipment-installation counts | Optional snapshot stock. Min is a reorder point. The baseline buffer is zero. Preserve Min, Max, raw lead days, H/M/L and total installations for analysis. Keep blank criticality associations and zero prices visible. Currency is unspecified. |
+| Nominal lead time | One part-master value in calendar days | Round upward to whole days for OIL-041 or divide by 30.4375 then round upward for SPDF. Both use a one-period minimum. The raw value remains available, including zero days. |
+| Orders and demand | Observed demand is proxied by consumption | One regular release per part per review, unlimited supply capacity, full backordering and backlog-first fulfilment. No estimated expedite, freight, holding or downtime cost enters the simulation. |
+
+Selection uses IDs from the master, independent of dates and activity. The first 50 sorted IDs reproduce the historical demonstration. `--selection-seed N` samples up to `--max-items` uniformly without replacement from the sorted frame. The supply seed is separate. Full frames contain 1,500 OIL-041 and 14,523 SPDF parts. Preserve inactive items when estimating portfolio inventory and state the number of items with scored demand when reporting service.
+
+## Timing and planning equations
+
+At review origin $t$, receive actual arrivals and apply available stock to older backlog. The policy sees remaining on-hand $I$, backlog $B$, and outstanding nominal receipts $S_j$ at offsets $j$ from this review. An overdue outstanding commitment is provisionally assigned offset one. Early arrivals are immediately visible. Future actual arrival dates and current-period demand are hidden. Release today's order, observe demand, serve the available quantity immediately and carry the rest into backlog.
+
+The MRP forecast $f_t$ is the arithmetic mean of the last $W$ observed consumption buckets strictly before $t$, including zeros. Use all available history when there are fewer than $W$ observations. Forecasts stay constant over a plan. This estimates a level for intermittent series. It has no seasonal, occurrence/size, maintenance-schedule or failure model.
+
+For gross forecast $G_j$, safety stock $SS$, nominal lead $L$ and initial projected balance $A_{-1}=I-B$, the planner uses
+
+$$
+N_j=\max(0,G_j+SS-A_{j-1}-S_j),\qquad
+P_j=\begin{cases}0 & j<L\\ \operatorname{lot}(N_j)& j\ge L,\end{cases}
+\qquad A_j=A_{j-1}+S_j+P_j-G_j.
+$$
+
+A planned receipt $P_j$ requires a release at $j-L$. Before the feasible receipt date, negative projected availability carries the expected shortage forward. Deficits from successive rows must never be added together. The first possible new receipt determines today's release. With a level forecast the same calculation reduces to
+
+$$
+Q_t=\operatorname{lot}\!\left(\max\!\left[0,(L+1)f_t+SS+B-I-\sum_{j=0}^{L} S_j\right]\right).
+$$
+
+The receipt-day demand bucket is included because orders arrive before demand. Later proposals can change at every review. The rolling simulator computes this one quantity. The detailed planner produces the complete schedule at the first review and for hand checks. `plan(..., earliest_receipt=0)` also supports textbook backward offsetting and marks past-due proposals. The exported first plan applies the executable fence $L$.
+
+Lot sizing returns zero for a zero requirement. A positive order covers both the net requirement and MOQ, rounded upward to the smallest increment divisible by both active lot sizes. With fixed lots of 20 and packs of 6, 60 is the first feasible quantity. The default increment is one. Decimal lot sizes are supported. Numerical comparisons at arithmetic boundaries allow floating-point roundoff.
+
+## Calendar, initialization and supply scenarios
+
+Training establishes history. Simulation then starts with the chosen stock, zero open orders and zero backlog. Optional `--warmup-periods` executes reviews after training. All warmup stock, orders and backlog carry into evaluation. The ledger retains these rows and labels the split. Scores use evaluation demand and inventory, and count orders by **release date** within evaluation. Receipts can therefore include orders released during warmup.
+
+| Default | OIL-041 | SPDF oil |
+|---|---:|---:|
+| Period | day | month |
+| Training periods | 90 | 24 |
+| Forecast window | 60 | 12 |
+| Warmup periods | 0 | 0 |
+| Scored periods | 275 | 21 |
+
+The requested planning horizon defaults to 60 and extends to at least $L+1$ for each item. Forecasts and committed orders may extend beyond the observed calendar. The model carries outstanding terminal orders and backlog at face quantity. A finite horizon therefore needs terminal-state reporting alongside service.
+
+Supply is deterministic by default. A positive `--lead-time-cv c` specifies a sensitivity scenario. For $L>1$, draw a mean-one lognormal multiplier $Z$ with $\mathrm{CV}(Z)=cL/(L-1)$ and set $X=1+(L-1)Z$. Then $E[X]=L$ and $\mathrm{SD}(X)=cL$. Round $X$ up with probability equal to its fractional part and down otherwise. Conditional expectation is $X$, so integer lead times preserve the nominal mean. Rounding adds variance. When $L=1$, the only positive integer distribution with that mean is a constant one. The realized distribution among released orders depends on the SKU mix and release dates.
+
+The seed, SKU and release period key an independent supply draw. Policies ordering the same SKU on the same date share that draw. This construction has no supplier-wide disruption correlation. OIL-041 supplier samples are synthetic and lack purchase-order/date linkage. SPDF supplies nominal lead times only. Neither source identifies this stochastic law.
+
+## Running and inspecting an experiment
 
 ```powershell
-python -m pip install -r requirements.txt
-python -m unittest discover -s tests -v
-python -m src.mrp --output results/mrp_oil041
-python -m src.mrp --offshore-only --lead-time-cv 0.5 --seed 42 --output results/mrp_offshore_uncertain
-python -m src.mrp --source spdf-oil --returns clip --output results/mrp_spdf
+python -m src.mrp --help
+python -m src.mrp --output results/local/daily
+python -m src.mrp --train-periods 60 --warmup-periods 30 --output results/local/warm
+python -m src.mrp --offshore-only --lead-time-cv 0.5 --seed 42 --output results/local/offshore
+python -m src.mrp --source spdf-oil --returns clip --output results/local/monthly
 ```
 
-Output directories must not already exist. Default: first 50 parts sorted by ID (not selected by future activity); use `--max-items 1500` for all OIL-041 parts. Initial inventory is zero unless `--source-stock` explicitly enables the undated source snapshot as a scenario assumption. Cold-start losses remain in reported KPIs. Compare both initialization settings and longer warmup experiments before thesis conclusions.
+Use a new output directory each time. The CLI checks balances before publishing the run. `--safety-stock`, `--minimum-order`, `--order-multiple` and `--fixed-order` set common scenario quantities in part units. The item schema can represent SKU-specific constraints. Validate any such rules against source knowledge before interpreting performance.
 
-OIL-041 uses 365 daily periods in 2021, first 90 for training, and a 60-day trailing mean. SPDF uses contiguous monthly data December 1997–August 2001, first 24 months for training, and a 12-month trailing mean. Override with `--train-periods`, `--forecast-window`; these are periods in the selected dataset, not always days. `--planning-horizon` defaults to 60 and is extended to at least lead time + 1 for each item. The initial deterministic plan may extend beyond the observed demand horizon; it contains forecasts, never unseen actual requirements.
-
-## Planning and execution
-
-For each period, net requirement is `max(0, gross + safety_stock - prior_projected_available - scheduled_receipts)`. Planned receipts cover this net amount subject to lot sizing. Projected stock then equals previous projected stock + scheduled receipts + planned receipts − gross. Opening backlog is subtracted from initial availability. Planned release date is receipt period minus nominal lead time. Negative release dates are explicitly flagged as past due, not silently dropped.
-
-Lot-for-lot is the default, rounded up to integer units. Optional `--minimum-order`, `--order-multiple`, `--fixed-order` apply to all selected SKUs; the canonical Item schema permits per-SKU settings. Fixed lots round the requirement up to a multiple of the fixed quantity, then packaging multiples are applied. When fixed lots and packaging multiples differ, packaging rounding takes precedence. No order is generated merely to satisfy an MOQ when net requirement is zero. `--safety-stock` overrides the adapter's buffer in units.
-
-Simulation ordering is explicit:
-
-1. Receive orders that actually arrive; fulfil older backlog first.
-2. Forecast with past demand only, replan using on-hand stock, backlog and outstanding nominal receipts.
-3. Apply a feasible receipt fence: no new receipt is possible before nominal lead time. Carry intervening shortages forward, net against all committed arrivals, and release the requirement at the first feasible receipt date. This avoids repeatedly ordering shortages already covered by outstanding supply. There is no instantaneous or emergency receipt.
-4. Observe current demand; fulfil immediately available units and backorder the remainder. Append demand to history for next period's forecast.
-
-Future planned releases are proposals and are replanned, not committed orders. Released orders remain in the pipeline. Simulation records actual arrival times, but policies see only nominal promises; overdue outstanding orders are assumed to arrive next period until actually received. This explicit promise-date assumption can be replaced for later experiments. No receipts are silently brought forward to the experiment's end.
-
-`--lead-time-cv 0` uses deterministic nominal lead times. Positive CV applies a mean-one lognormal multiplier, rounds upward, and enforces at least one period. Rounding changes the realized mean/CV. Randomness is keyed by seed, SKU and release period, so policies ordering the same item on the same date receive the same supply shock. No future shock is exposed to the policy. This is a configurable assumed uncertainty model, not a fitted supplier distribution. Repeat multiple seeds/CVs and report uncertainty intervals for robustness; one run does not estimate robustness.
-
-## Data preparation and limitations
-
-- Raw data is never changed. Canonical items/demand and a source SHA-256 manifest are saved beside each run. Train/evaluation splits and all effective arguments are recorded.
-- OIL-041 consumption is summed across selected facilities into one virtual pooled stockpoint per part. Offshore filtering uses facility flags. Missing daily events become zero; consumption is assumed to proxy demand. This is not a warehouse network model. Do not treat warehouse issues as additional demand. Source safety stocks are summed across matching inventory rows; absent pairs contribute zero. The undated snapshot safety stock is an explicit synthetic scenario parameter, not a historically validated buffer. Snapshot stock (if requested) subtracts reservations. Prices are USD. No generated stockout/reliability/recommendation labels drive decisions.
-- OIL-041 nominal lead times come from the part master, rounded upward to days. Its supplier samples could support future conditional distribution fitting, but lack order/date linkage; no such fitting is claimed here. Its emergency-event chronology is inconsistent, so source emergency results are not replayed.
-- SPDF reads the two original oil halves, not the altered OIL workbook. It discards the prefix through unreliable November 1997 to preserve a contiguous calendar. Whole-year blanks are converted to zero only according to source documentation; partial-year blanks cause an error. Negative net consumption is rejected by default. Explicit `--returns clip` creates a nonnegative proxy and records the number clipped; it cannot recover gross demand or separately model returns. Nominal days are divided by 30.4375 then rounded upward to monthly buckets, a coarse approximation. Original `Min` is a reorder point and is not misused as safety stock: default safety stock is zero. Source currency is unknown; zero prices are retained and counted. Item quantities may have differing source units.
-- Dataset selection is a deterministic small demonstration, not a representative statistical sample. The source snapshots, demand censoring, aggregation, fractional mean forecast, cold start and terminal backlog affect results. These assumptions must be varied/justified in the thesis.
-
-## Outputs and KPI definitions
-
-| File | Meaning |
+| Output | Interpretation |
 |---|---|
-| `items.csv`, `demand.csv` | Canonical parameters and chronological demand with train/evaluation split. |
-| `initial_plan.csv` | Complete initial time-phased gross/net requirements, scheduled/planned receipts, projected availability, release offsets and past-due exceptions; local period 0 is first evaluation period. |
-| `decisions.csv` | Rolling forecast, order release quantity and past-due planned quantity per item/period. |
-| `orders.csv` | Committed releases, nominal and actual due periods, quantities, realized lead times, horizon-censoring flag. Period indices refer to full canonical calendar. |
-| `inventory.csv` | Receipts, stock, demand, immediate fulfilment, backlog service, backlog, releases, pipeline and on-hand value each evaluation period. |
-| `metrics.json` | Demand-weighted immediate unit fill rate; fraction of positive-demand item-periods fully served; stockout/backlog item-periods; ending backlog/pipeline; average aggregate end-period stock/value; order counts. Zero-demand service metrics are null. |
-| `run.json` | Source hashes, transformations, units, configuration, effective CLI arguments and modelling assumptions. |
+| `items.csv` | Effective item parameters alongside descriptive source fields. Zero OIL-041 snapshot totals with `inventory_rows=0` indicate missing coverage. |
+| `demand.csv` | Canonical demand, dates and split. SPDF includes signed source net consumption and cell treatment. Blank source cells remain blank. |
+| `initial_plan.csv` | Complete feasible first plan. Offset zero is the first simulated review, which can be a warmup review. |
+| `decisions.csv` | Full-calendar review dates, policy-supplied forecast, release and effective horizon. |
+| `orders.csv` | Committed quantities, release periods, promised and actual due periods, and terminal receipt flags. Actual due dates are ex-post audit information. |
+| `inventory.csv` | Beginning and ending stock, pipeline and backlog, receipts, releases, immediate and delayed fulfilment, value and split. |
+| `metrics.json`, `item_metrics.csv` | Portfolio scores and the same measures by SKU for joining with source attributes. |
+| `run.json` | Effective configuration, arguments, source and implementation byte hashes, Python/reader versions, transformation counts, scored dates and maximum balance residuals. |
 
-The demand-period service rate is **not cycle service level**. Stockout item-periods are not distinct stockout episodes. Backorders fulfilled later do not improve immediate fill rate. Inventory value excludes pipeline and backorders; average value sums across SKUs then averages across evaluation periods. No mixed-currency aggregation across datasets is performed. Emergency orders are zero by design because no expedite policy is enabled; this is not a prediction of emergency usage. Costs are not total operating costs: no unsupported holding/freight/downtime rates are invented.
+**Service.** Unit fill is immediately served units divided by requested units. Mean item fill averages that ratio equally across items with positive evaluation demand. Demand-period service measures fully served positive-demand SKU-periods. A zero denominator yields JSON null or an empty CSV field. Stockout item-periods count periods with unmet new demand. Backlog item-periods also include periods with carryover shortages. These measures use aggregated buckets. Event service, replenishment-cycle service and elapsed waiting time need different observations.
 
-## Extension contract
+**Inventory and orders.** Sum closing on-hand units or their source-price value across the cohort, then average across evaluation periods. Quantities can represent heterogeneous parts. Zero-priced inventory contributes units but no value. Opening and ending stock, backlog and pipeline expose boundary effects. For each SKU, opening pipeline plus released units equals receipts plus ending pipeline. Retain this identity when comparing runs with warmup. Emergency orders are always zero under the regular-order model.
 
-`src/data/schema.py`: validated `Item` and `Dataset`. `src/mrp/planning.py`: pure netting/offsetting/lot sizing plus `MRPPolicy`. `src/simulation/engine.py`: inventory execution and keyed lead-time scenarios. `src/evaluation/metrics.py`: common metrics. The CLI orchestrates adapters and serialization.
+## Future policy comparison
 
-A DDMRP policy implements `decide(item, history, on_hand, backlog, scheduled, horizon, window) -> (quantity, audit_rows)`. Inputs contain only information available at the release decision. Audit rows may be empty; any past-due rows use `planned_receipts` and `past_due_release`. The simulator accepts nonnegative finite order quantities, not future inventory outcomes. Use identical canonical inputs, initialization, calendar, supply shocks and KPI definitions for both policies. Add explicit policy information/state and an expedite interface if the later DDMRP specification needs them rather than bypassing the engine.
+The engine owns the calendar, arrivals, lot constraints, fulfilment, inventory and common scoring. A policy implements `release(item, state) -> Decision(quantity, forecast=None)`. The state provides the absolute review period, past demand within the configured lookback, usable stock, residual backlog, nominal scheduled quantities by offset, and review horizon. Each call receives its own schedule mapping. The engine records the policy's optional forecast. Raw source attributes, future demand and realized lead times stay outside this interface. `MRPPolicy.decide(...)` remains available for detailed MRP audits. Existing policies using the original seven-argument `decide` API can still return a quantity and audit rows. They receive the full observed history. Their logged forecast is empty because that API does not identify the forecast used.
 
-Tests cover hand-calculated netting/offsetting, backlog and buffer treatment, MOQ/multiples/fixed lots, invalid inputs, no magical receipts, conservation of stock/backlog/pipeline, temporal leakage, seeded uncertainty, zero-demand metrics, daily offshore preprocessing and CLI/source preservation.
+1. Freeze the cohort or sampling design, observation calendar, proxy treatments, shared information, lot rules, costs and supply scenarios. Compare each policy on the same holdout dates. Predeclare whether initialization measures startup or ongoing operation. A warmup gives each policy the same opportunity to build its own state.
+2. Use successive training/validation origins to choose forecast windows, MRP safety stocks, and eventually DDMRP buffer parameters. Give both policies equivalent search budgets and objectives. Reserve the final holdout and independent supply seeds for scoring. An observed MRP buffer or a zero SPDF buffer is one scenario choice. Record the service–inventory trade-off for each method.
+3. Within each scenario, calculate paired KPI differences. Report them by dataset and period unit, with denominators, criticality or training-defined activity groups, and opening/terminal exposure. Replicate supply seeds to estimate uncertainty conditional on the demand path. Additional seeds on one path give no estimate of demand-history uncertainty.
+4. Preserve shared fulfilment rules when extending the policy interface. Material requirements from a BOM, a facility network, known maintenance orders or confirmed supplier updates require documented new inputs. Inventory value alone cannot establish total cost or downtime benefits.
+
+The [review results](../results/README.md) quantify the effects measured on these files.

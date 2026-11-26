@@ -1,14 +1,17 @@
-# DDMRP-in-Maritime-Supply-Chains
+# MRP baseline for maritime and offshore spare parts
 
-MRP baseline for spare-parts/MRO experiments. From this directory:
+This thesis model simulates periodic replenishment of independently demanded spares at a single pooled stockpoint per part. It produces a dated order book, an inventory ledger and service and inventory measures for future policy comparisons.
+
+From the repository root, with Python 3.10 or newer and the OIL-041 source files in place, run
 
 ```powershell
 python -m unittest discover -s tests -v
-python -m src.mrp --output results/mrp_oil041
+python -m src.mrp --output results/local/oil041
 ```
 
-Python 3.10+. Default OIL-041 execution needs no third-party packages; `python -m pip install -r requirements.txt` enables the optional SPDF Excel adapter.
+The daily baseline uses the Python standard library. Install `requirements.txt` for the monthly Excel adapter or `notebooks/requirements.txt` for the executable walkthrough. Each CLI run needs a new output directory.
 
-See [model assumptions, commands and outputs](docs/mrp_baseline.md) and [dataset assessment](docs/dataset_inventory.md). Raw downloads remain unchanged. Run directories contain canonical inputs, MRP plans, simulation ledgers, orders, KPIs and provenance.
-
-For an executable walkthrough with worked calculations, plots, KPIs and validation, open [notebooks/mrp_model.ipynb](notebooks/mrp_model.ipynb). Install its separate dependencies with `python -m pip install -r notebooks/requirements.txt`, select that environment as the kernel, and run all cells.
+- Locate the raw files and check their hashes in the [source guide](SOURCES.md).
+- Follow one part through forecasting, ordering, receipt and scoring in the [notebook](notebooks/mrp_model.ipynb).
+- See the equations, policy interface, output definitions and comparison protocol in the [model specification](docs/mrp_baseline.md).
+- Read the [review and validation results](results/README.md) for measured changes and the status of archived outputs. The [dataset inventory](docs/dataset_inventory.md) covers the wider thesis collection.

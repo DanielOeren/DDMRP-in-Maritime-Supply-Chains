@@ -1,3 +1,6 @@
 data/temp_downloads/
 __pycache__/
 *.py[cod]
+.venv/
+.ipynb_checkpoints/
+results/local/

@@ -1,6 +1,6 @@
 # Dataset inventory for the DDMRP thesis
 
-Inspected: 12 November 2026. Initial scope: **175 files** (150.8 MB); subsequently added the complete public OIL-041 sample repository (**15 files**, 9,933,448 bytes). Current scope: **190 files**, 160,719,324 bytes. Paths below are relative to `data/temp_downloads/`. Source files were preserved; no cleaning or conversion was saved.
+Inspected: 12 November 2026. Initial scope: **175 files** (150.8 MB); subsequently added the complete public OIL-041 sample repository (**15 files**, 9,933,448 bytes). Current scope: **190 files**, 160,719,324 bytes. Paths below are relative to `data/temp_downloads/`. Counts and file descriptions refer to the raw collection at inspection. The MRP adapters now write derived inputs into separate run directories.
 
 **Recommendation:** start with the original oil/MRO workbooks in `spdf-main`, which combine consumption with delivery times, inventory parameters, prices and equipment criticality. Use manufacturing and RAF data as external benchmarks, and synthetic data for controlled robustness experiments. **OIL-041 is the richest synthetic scenario candidate**, adding timestamped consumption, supplier variability and emergency procurement, but its tables are not a validated chronological inventory simulation. These downloads support a simulation study, but do not by themselves establish that DDMRP improves a real maritime/offshore supply chain.
 
@@ -75,7 +75,7 @@ Material limitations for simulation:
 - **Lead-time assumptions:** actual synthetic lead times range 2.3–365 days (median 31.6); 44.35% of rows are labeled on time. Among rows with reliability above 0.92, only **61.58%** are on time, contrary to the card's claim of at least 85%. Use inspected values and sensitivity scenarios, not the advertised validation grade, as the basis for experiments.
 - **Reproducibility and evaluation:** without the generator or scorecard, seeded regeneration and the claimed reference calibration cannot be audited. Recalculate ADU/intermittency from the selected training events, reconcile its scope with master `mean_monthly_demand`, and regenerate all stock/service/emergency outcomes under each tested policy. Treat supplied stockout, cost and recommendation outputs as synthetic assumptions or diagnostics, not comparative evidence.
 
-Recommended role: build an explicitly documented synthetic event-driven MRO scenario using its item costs/criticality, consumption and supplier-delay distributions; compare traditional replenishment and DDMRP on shared demand/disruption inputs. Retain the original SPDF oil data as the primary empirical candidate. No OIL-041 filtering, corrections or preprocessing have been saved.
+Recommended role: build an explicitly documented synthetic event-driven MRO scenario using its item costs/criticality, consumption and supplier-delay distributions; compare traditional replenishment and DDMRP on shared demand/disruption inputs. Retain the original SPDF oil data as the primary empirical candidate. The executable adapter records the selected scope, snapshot coverage and source hashes in each run. See the [MRP specification](mrp_baseline.md).
 
 ## What the thesis still needs
 
